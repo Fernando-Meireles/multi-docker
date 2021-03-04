@@ -1,0 +1,33 @@
+#sudo: required
+language: generic
+os: linux
+dist: xenial
+
+# tell travis-ci to use a docker service for their workers
+services:
+  - docker
+
+# build a test image version of the client
+before_install:
+  - docker build -t mrlsmiguel/react-test -f ./client/Dockerfile.dev ./client
+
+# run tests inside the docker image built before
+# in this simple case we are just doing a mock test 
+# the images are not changed extensively but one might want to create
+# tests for the other images too
+script:
+  - docker run -e CI=true mrlsmiguel/react-test npm test -- --coverage
+
+# if the tests pass we can build a prod image 
+after_success:
+  - docker build -t mrlsmiguel/multi-client ./client
+  - docker build -t mrlsmiguel/multi-nginx ./nginx
+  - docker build -t mrlsmiguel/multi-server ./server
+  - docker build -t mrlsmiguel/multi-worker ./worker
+
+  # push prod images to the registry
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  - docker push mrlsmiguel/multi-client
+  - docker push mrlsmiguel/multi-nginx
+  - docker push mrlsmiguel/multi-server
+  - docker push mrlsmiguel/multi-worker
